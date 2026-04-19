@@ -1,0 +1,12 @@
+{
+  "name": "vp-chef-camera-relay",
+  "version": "1.0.0",
+  "description": "Local relay that bridges RTSP camera feeds to the VP Chef Studio cloud server",
+  "main": "relay.js",
+  "scripts": {
+    "start": "node relay.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
