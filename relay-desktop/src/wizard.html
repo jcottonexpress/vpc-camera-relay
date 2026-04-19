@@ -8,10 +8,6 @@
   <style>
     body { display: flex; flex-direction: column; min-height: 100vh; }
     .wizard-wrap { flex: 1; }
-    .scan-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
-    .scan-result { font-size:11px; color:#888; margin-top:4px; }
-    .scan-result.found { color:#22c55e; }
-    .scan-result.err   { color:#e63946; }
     .pairing-box { background:#0f1a2e; border:1px solid #1d4ed8; border-radius:10px; padding:14px; margin-top:10px; }
     .pairing-box h4 { color:#93c5fd; margin:0 0 8px; font-size:13px; }
     .ip-pill { display:inline-block; background:#1e3a5f; color:#93c5fd; border-radius:6px; padding:4px 10px; font-size:14px; font-weight:700; font-family:monospace; margin:2px 3px; }
@@ -57,29 +53,31 @@
       <p>Tap <strong>Scan Network</strong> to automatically find cameras on your WiFi — or enter each IP address manually if you already know them.</p>
     </div>
 
-    <div class="scan-row">
-      <button class="btn primary" id="scan-btn" onclick="scanNetwork()">🔍 Scan Network for Cameras</button>
-      <span class="scan-result" id="scan-status"></span>
+    <div style="margin-bottom:10px;">
+      <a href="#" onclick="window.relay.openHelp(); return false;"
+         style="font-size:12px; color:#93c5fd; text-decoration:none;">
+        📖 How to find your camera IP address →
+      </a>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:8px;">
       <div class="cam-row">
         <label>CAM 1</label>
-        <input type="text" id="cam1-ip"    placeholder="192.168.1.177" />
+        <input type="text" id="cam1-ip"    placeholder="e.g. 192.168.1.100" />
         <input type="text" id="cam1-label" placeholder="Performance Cam" style="max-width:130px;" />
         <button class="btn ghost sm" onclick="testCam(1)">Test</button>
         <span class="test-badge" id="cam1-badge"></span>
       </div>
       <div class="cam-row">
         <label>CAM 2</label>
-        <input type="text" id="cam2-ip"    placeholder="192.168.1.178" />
+        <input type="text" id="cam2-ip"    placeholder="e.g. 192.168.1.101" />
         <input type="text" id="cam2-label" placeholder="Food Prep Cam" style="max-width:130px;" />
         <button class="btn ghost sm" onclick="testCam(2)">Test</button>
         <span class="test-badge" id="cam2-badge"></span>
       </div>
       <div class="cam-row">
         <label>CAM 3</label>
-        <input type="text" id="cam3-ip"    placeholder="192.168.1.179" />
+        <input type="text" id="cam3-ip"    placeholder="e.g. 192.168.1.102" />
         <input type="text" id="cam3-label" placeholder="Stovetop Cam" style="max-width:130px;" />
         <button class="btn ghost sm" onclick="testCam(3)">Test</button>
         <span class="test-badge" id="cam3-badge"></span>
@@ -148,15 +146,15 @@
 
     <!-- Phone pairing -->
     <div class="pairing-box" id="pairing-box">
-      <h4>📱 Connect Your Phone</h4>
+      <h4>📱 Connect VP Chef Studio on Your Phone</h4>
       <p style="font-size:11px;color:#888;margin:0 0 8px;">
-        Once the relay is running, open the VP Chef Studio app on your phone → Settings → Camera Relay Setup → enter one of these IP addresses:
+        Once the relay is running, open <strong>VP Chef Studio</strong> on your phone → <strong>Settings → Camera Relay Setup</strong> and enter <em>this PC's IP address</em> shown below. Your phone will connect to this PC to reach the cameras:
       </p>
       <div id="pc-ip-list" style="margin-bottom:6px;">
         <span style="color:#555;font-size:11px;">Loading…</span>
       </div>
       <p style="font-size:10px;color:#666;margin:0;">
-        Make sure your phone is on the same WiFi network as this PC.
+        ⚠️ Your phone must be on the same WiFi network as this PC. These are <em>this PC's</em> addresses — not camera IPs.
       </p>
     </div>
 
@@ -222,49 +220,6 @@ function goStep(n) {
   if (n === 4) updateSummary();
 }
 
-async function scanNetwork() {
-  const btn    = document.getElementById("scan-btn");
-  const status = document.getElementById("scan-status");
-  btn.disabled = true;
-  btn.textContent = "⏳ Scanning…";
-  status.textContent = "Scanning your network — this takes about 8 seconds…";
-  status.className = "scan-result";
-  try {
-    const result = await window.relay.discoverCameras();
-    if (!result || result.error) throw new Error(result?.error || "Scan failed");
-    const found = result.found || [];
-    if (found.length === 0) {
-      status.textContent = "No cameras found. Try entering IPs manually.";
-      status.className = "scan-result err";
-    } else {
-      // Auto-assign IPs to slots in order
-      found.forEach((cam, idx) => {
-        const slot = cam.suggestedSlot || (idx + 1);
-        if (slot >= 1 && slot <= 3) {
-          const ipEl = document.getElementById(`cam${slot}-ip`);
-          if (ipEl && !ipEl.value) ipEl.value = cam.ip;
-        }
-      });
-      // Fill remaining slots in order
-      let nextSlot = 1;
-      found.forEach(cam => {
-        while (nextSlot <= 3) {
-          const ipEl = document.getElementById(`cam${nextSlot}-ip`);
-          if (ipEl && !ipEl.value) { ipEl.value = cam.ip; nextSlot++; break; }
-          nextSlot++;
-        }
-      });
-      status.textContent = `✓ Found ${found.length} device${found.length !== 1 ? "s" : ""} — IPs filled in above.`;
-      status.className = "scan-result found";
-    }
-  } catch (e) {
-    status.textContent = "Scan failed: " + e.message;
-    status.className = "scan-result err";
-  }
-  btn.disabled = false;
-  btn.textContent = "🔍 Scan Network for Cameras";
-}
-
 async function testCam(slot) {
   const ip    = document.getElementById(`cam${slot}-ip`).value.trim();
   const badge = document.getElementById(`cam${slot}-badge`);
@@ -278,7 +233,7 @@ async function testCam(slot) {
 
 function updateSummary() {
   const cams = [1,2,3].map(i => {
-    const ip    = document.getElementById(`cam${i}-ip`).value.trim() || `192.168.1.17${i+6}`;
+    const ip    = document.getElementById(`cam${i}-ip`).value.trim() || '(not entered)';
     const label = document.getElementById(`cam${i}-label`).value.trim() || `Camera ${i}`;
     return `CAM${i}: ${label} (${ip})`;
   });
@@ -300,7 +255,7 @@ async function finish() {
     onvifPass: document.getElementById("rtsp-pass").value,
     cameras: [1,2,3].map(i => ({
       slot:  i,
-      ip:    document.getElementById(`cam${i}-ip`).value.trim() || `192.168.1.17${i+6}`,
+      ip:    document.getElementById(`cam${i}-ip`).value.trim() || '',
       label: document.getElementById(`cam${i}-label`).value.trim() || `Camera ${i}`,
     })),
   };
