@@ -28,6 +28,7 @@ let relayStatus = {
   serverConnected: false,
   cameras: [],
   recording: false,
+  pcIps: [],
 };
 
 // ─── Tray icon ────────────────────────────────────────────────────────────────
@@ -205,6 +206,7 @@ function pollStatus() {
         }));
         relayStatus.serverConnected = data.serverConnected ?? relayStatus.serverConnected;
         relayStatus.recording       = data.recording       ?? relayStatus.recording;
+        relayStatus.pcIps           = data.pcIps           ?? relayStatus.pcIps;
         updateTray();
       } catch {}
     });
@@ -310,6 +312,34 @@ ipcMain.handle("set-login-item", (_, enabled) => {
 });
 ipcMain.handle("test-camera",    (_, ip) => testCamera(ip));
 ipcMain.handle("open-relay-dir", () => { shell.openPath(RELAY_DIR); return true; });
+
+// ─── Network / pairing helpers ────────────────────────────────────────────────
+ipcMain.handle("get-pc-ips", () => {
+  const { networkInterfaces } = require("os");
+  const nets = networkInterfaces();
+  const ips = [];
+  for (const name of Object.keys(nets)) {
+    for (const iface of nets[name]) {
+      if ((iface.family === "IPv4" || iface.family === 4) && !iface.internal) ips.push(iface.address);
+    }
+  }
+  return ips;
+});
+
+ipcMain.handle("discover-cameras", () => {
+  return new Promise((resolve) => {
+    const req = http.get("http://localhost:8082/cam/discover", { timeout: 15000 }, (res) => {
+      let body = "";
+      res.on("data", (d) => body += d);
+      res.on("end", () => {
+        try { resolve(JSON.parse(body)); }
+        catch { resolve({ found: [], error: "Bad response" }); }
+      });
+    });
+    req.on("error", (e) => resolve({ found: [], error: e.message }));
+    req.on("timeout", () => { req.destroy(); resolve({ found: [], error: "Timeout" }); });
+  });
+});
 
 // ─── Camera test ──────────────────────────────────────────────────────────────
 function testCamera(ip) {
