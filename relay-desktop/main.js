@@ -82,46 +82,85 @@ function getBundledFfmpeg() {
 }
 
 // ─── Relay process management ─────────────────────────────────────────────────
+
+/**
+ * Returns the best Node.js runtime available:
+ *   1. Bundled portable node.exe placed by CI (Windows, resources/bin/node.exe)
+ *   2. Electron-as-Node via ELECTRON_RUN_AS_NODE=1 (all platforms, fallback)
+ */
+function getRelayRuntime() {
+  // Prefer bundled portable node.exe on Windows — avoids ELECTRON_RUN_AS_NODE
+  // quirks on machines that don't have Node.js installed globally.
+  if (process.platform === "win32" && app.isPackaged) {
+    const bundled = path.join(process.resourcesPath, "bin", "node.exe");
+    if (fs.existsSync(bundled)) {
+      return { execPath: bundled, extraEnv: {} };
+    }
+  }
+  // Fallback: run Electron itself in Node mode (no separate node.exe needed)
+  return { execPath: process.execPath, extraEnv: { ELECTRON_RUN_AS_NODE: "1" } };
+}
+
 function startRelay() {
   if (relayProc) return;
 
-  // Use Electron's own bundled Node.js runtime (ELECTRON_RUN_AS_NODE=1).
-  // This avoids requiring a separate system-installed node.exe on the user's PC.
   const relayScript = (relayJsOverride && fs.existsSync(relayJsOverride))
     ? relayJsOverride
     : RELAY_JS;
 
   const ffmpegPath = getBundledFfmpeg();
-  const relayEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  const { execPath, extraEnv } = getRelayRuntime();
+  const relayEnv = { ...process.env, ...extraEnv };
   if (ffmpegPath && fs.existsSync(ffmpegPath)) {
     relayEnv.FFMPEG_PATH = ffmpegPath;
   }
 
-  relayProc = spawn(process.execPath, [relayScript], {
+  pushLog(`[relay] Starting with runtime: ${path.basename(execPath)}`);
+
+  const proc = spawn(execPath, [relayScript], {
     cwd: RELAY_DIR,
     env: relayEnv,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
 
-  relayProc.stdout.on("data", (d) => {
+  // CRITICAL: handle spawn errors (e.g. executable not found) — without this
+  // the error becomes an uncaught exception that crashes the Electron app.
+  proc.on("error", (err) => {
+    pushLog(`[relay] ✗ Spawn failed (${path.basename(execPath)}): ${err.message}`);
+    if (relayProc === proc) {
+      relayProc = null;
+      relayStatus.running = false;
+      relayStatus.serverConnected = false;
+      updateTray();
+    }
+    dialog.showErrorBox(
+      "VP Chef Relay — Could Not Start",
+      `The relay process could not be started:\n${err.message}\n\nPlease reinstall VP Chef Relay or contact support at vp-chef-studio.replit.app`
+    );
+  });
+
+  proc.stdout.on("data", (d) => {
     const line = d.toString();
     pushLog(line);
     parseRelayLine(line);
   });
 
-  relayProc.stderr.on("data", (d) => {
+  proc.stderr.on("data", (d) => {
     pushLog("[err] " + d.toString());
   });
 
-  relayProc.on("exit", (code) => {
-    pushLog(`[relay] Process exited (code ${code})`);
-    relayProc = null;
-    relayStatus.running = false;
-    relayStatus.serverConnected = false;
-    updateTray();
+  proc.on("exit", (code) => {
+    if (relayProc === proc) {
+      pushLog(`[relay] Process exited (code ${code})`);
+      relayProc = null;
+      relayStatus.running = false;
+      relayStatus.serverConnected = false;
+      updateTray();
+    }
   });
 
+  relayProc = proc;
   relayStatus.running = true;
   updateTray();
   startPolling();
