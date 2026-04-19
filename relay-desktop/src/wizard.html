@@ -135,8 +135,8 @@
     </div>
   </div>
 
-  <!-- Step 3: Credentials -->
-  <div class="wizard-step" id="step-3">
+  <!-- Step 4: Credentials -->
+  <div class="wizard-step" id="step-4">
     <div class="step-num">Step 4 of 5</div>
     <div class="step-header">
       <h2>Camera Password</h2>
@@ -159,17 +159,16 @@
     </div>
 
     <div class="row-actions" style="margin-top:auto;">
-      <button class="btn ghost" onclick="goStep(2)">← Back</button>
-      <button class="btn primary" onclick="goStep(4)">Next →</button>
+      <button class="btn ghost" onclick="goStep(3)">← Back</button>
+      <button class="btn primary" onclick="goStep(5)">Next →</button>
     </div>
     <div class="progress-dots">
-      <span id="dot-1"></span><span id="dot-2"></span>
-      <span class="active" id="dot-3"></span><span id="dot-4"></span>
+      <span id="dot-1"></span><span id="dot-2"></span><span id="dot-3"></span><span class="active" id="dot-4"></span><span id="dot-5"></span>
     </div>
   </div>
 
-  <!-- Step 4: Confirm + Pair -->
-  <div class="wizard-step" id="step-4">
+  <!-- Step 5: Confirm + Pair -->
+  <div class="wizard-step" id="step-5">
     <div class="step-num">Step 5 of 5</div>
     <div class="step-header">
       <h2>Almost Done!</h2>
@@ -195,12 +194,11 @@
     </div>
 
     <div class="row-actions" style="margin-top:auto;">
-      <button class="btn ghost" onclick="goStep(3)">← Back</button>
+      <button class="btn ghost" onclick="goStep(4)">← Back</button>
       <button class="btn primary" onclick="finish()">🚀 Launch Relay</button>
     </div>
     <div class="progress-dots">
-      <span id="dot-1"></span><span id="dot-2"></span>
-      <span id="dot-3"></span><span class="active" id="dot-4"></span>
+      <span id="dot-1"></span><span id="dot-2"></span><span id="dot-3"></span><span id="dot-4"></span><span class="active" id="dot-5"></span>
     </div>
   </div>
 
@@ -220,8 +218,9 @@ async function init() {
       if (lb) lb.value = c.label || "";
     });
   }
-  if (cfg.rtspUser)  document.getElementById("rtsp-user").value  = cfg.rtspUser;
-  if (cfg.rtspPass)  document.getElementById("rtsp-pass").value  = cfg.rtspPass;
+  if (cfg.rtspUser)   document.getElementById("rtsp-user").value   = cfg.rtspUser;
+  if (cfg.rtspPass)   document.getElementById("rtsp-pass").value   = cfg.rtspPass;
+  if (cfg.relayToken) document.getElementById("relay-token").value = cfg.relayToken;
   // Load PC IPs for the pairing panel
   loadPcIps();
 }
@@ -248,12 +247,12 @@ function goStep(n) {
   document.getElementById(`step-${currentStep}`).classList.remove("active");
   document.getElementById(`step-${n}`).classList.add("active");
   // Update dots
-  [1,2,3,4].forEach(i => {
+  [1,2,3,4,5].forEach(i => {
     const d = document.getElementById(`dot-${i}`);
     if (d) d.className = i === n ? "active" : "";
   });
   currentStep = n;
-  if (n === 4) updateSummary();
+  if (n === 5) updateSummary();
 }
 
 async function testCam(slot) {
@@ -278,7 +277,8 @@ function updateSummary() {
     const pass = document.getElementById("rtsp-pass").value;
     box.innerHTML = `<strong>Cameras:</strong><br>${cams.join("<br>")}<br><br>` +
       `<strong>RTSP User:</strong> ${document.getElementById("rtsp-user").value || "admin"}&nbsp;&nbsp;` +
-      `<strong>Password:</strong> ${pass ? "●●●●●●" : "(none)"}`;
+      `<strong>Password:</strong> ${pass ? "●●●●●●" : "(none)"}<br>` +
+      `<strong>Relay Token:</strong> ${document.getElementById("relay-token").value ? "✓ Linked" : "(none — shared relay)"}`;
   }
   // Refresh PC IPs
   loadPcIps();
