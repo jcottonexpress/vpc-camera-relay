@@ -43,14 +43,19 @@ const RTSP_PORTS_TO_TRY = [5543, 554, 8554, 10554, 8080, 8090, 7070, 49152, 8000
 // RTSP URL paths to try for each camera model.
 // The relay iterates these until ffmpeg produces frames.
 const RTSP_PATHS_TO_TRY = [
-  // ── LV-PWF1-BT confirmed working path (discovered via ONVIF, use directly) ─
+  // ── LaView LV-PWF1-BT (port 10554) — confirmed working, try FIRST ─────────
+  "/tcp/av0_0",
+  "/av0_0",
+  "/h264/ch01/main/av_stream",
+  "/h264/ch01/sub/av_stream",
+  // ── LV-PWF1-BT ONVIF-discovered path ──────────────────────────────────────
   "/685b2cab121c0e1032e925da3cfb8b4f/live/channel0",
-  // ── Happytimesoft / LV-PWF1-BT confirmed paths (try these first) ─────────
-  "/user_0.264",                               // Happytimesoft main stream
-  "/user_1.264",                               // Happytimesoft sub-stream
-  "/user_0",                                   // alternate no-extension form
+  // ── Happytimesoft / LV-PWF1-BT alternative paths ──────────────────────────
+  "/user_0.264",
+  "/user_1.264",
+  "/user_0",
   "/user_1",
-  "/live/ch00_0",                              // Happytimesoft live variant
+  "/live/ch00_0",
   "/live/ch01_0",
   "/live/main",
   "/live/sub",
@@ -67,15 +72,11 @@ const RTSP_PATHS_TO_TRY = [
   "/onvif/streaming/channels/101",
   "/Streaming/Channels/101",
   "/Streaming/Channels/102",
-  // ── Other LaView / generic paths ──────────────────────────────────────────
-  "/h264/ch01/main/av_stream",
-  "/h264/ch01/sub/av_stream",
+  // ── Generic paths ─────────────────────────────────────────────────────────
   "/livestream/1",
   "/livestream/0",
   "/live",
   "/stream",
-  "/tcp/av0_0",
-  "/av0_0",
   "/cam/realmonitor?channel=1&subtype=0",
   "/video1",
   "/0",
@@ -118,11 +119,17 @@ let ONVIF_PASS = "";
       // Allow relay-config.json to override the default camera list (for multi-user setup)
       if (Array.isArray(cfg.cameras) && cfg.cameras.length > 0) {
         CAMERAS.splice(0, CAMERAS.length, ...cfg.cameras.map(c => ({
-          slot:  Number(c.slot),
-          ip:    String(c.ip),
-          label: String(c.label || `Camera ${c.slot}`),
+          slot:         Number(c.slot),
+          ip:           String(c.ip),
+          label:        String(c.label || `Camera ${c.slot}`),
+          savedRtspPath: cfg.workingRtspPaths?.[c.ip] ?? null, // last confirmed path
         })));
         console.log(`[config] Loaded ${CAMERAS.length} cameras from relay-config.json`);
+      } else {
+        // Apply saved RTSP paths to default CAMERAS list
+        if (cfg.workingRtspPaths) {
+          CAMERAS.forEach(c => { c.savedRtspPath = cfg.workingRtspPaths[c.ip] ?? null; });
+        }
       }
     } catch (e) {
       console.warn("[config] Could not parse relay-config.json — using defaults:", e.message);
@@ -1416,9 +1423,18 @@ function startCamera(camera, pathIndex = 0, transport = "tcp", consecutiveFails 
       console.log(`[${label}] ONVIF URL failed 3× — falling back to path guessing.`);
       camera.onvifUrl = null;
     }
-    const urlPath = RTSP_PATHS_TO_TRY[pathIndex % RTSP_PATHS_TO_TRY.length];
-    const auth    = RTSP_PASS ? `${RTSP_USER}:${RTSP_PASS}@` : (RTSP_USER ? `${RTSP_USER}:@` : "");
-    rtspUrl       = `rtsp://${auth}${ip}:${port}${urlPath}`;
+    // If we have a confirmed-working path from a previous run, try it first (pathIndex 0 only).
+    // This avoids the 30-path guessing sequence on every restart.
+    let urlPath;
+    if (pathIndex === 0 && camera.savedRtspPath) {
+      urlPath = camera.savedRtspPath;
+      console.log(`[${label}] Trying saved path → ${urlPath}`);
+    } else {
+      const adjustedIndex = (pathIndex === 0 && camera.savedRtspPath) ? 0 : pathIndex;
+      urlPath = RTSP_PATHS_TO_TRY[adjustedIndex % RTSP_PATHS_TO_TRY.length];
+    }
+    const auth = RTSP_PASS ? `${RTSP_USER}:${RTSP_PASS}@` : (RTSP_USER ? `${RTSP_USER}:@` : "");
+    rtspUrl    = `rtsp://${auth}${ip}:${port}${urlPath}`;
     console.log(`[${label}] Trying ${useTransport.toUpperCase()} → ${rtspUrl}`);
   }
 
@@ -1496,6 +1512,18 @@ function startCamera(camera, pathIndex = 0, transport = "tcp", consecutiveFails 
         // Store confirmed RTSP URL so recording processes can reuse it
         camera.activeRtspUrl   = rtspUrl;
         camera.activeTransport = useTransport;
+        // Persist the working RTSP path to relay-config.json so the next launch
+        // skips path guessing and streams immediately.
+        try {
+          const cfgPath = path.join(__dirname, "relay-config.json");
+          let cfg = {};
+          try { cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8")); } catch {}
+          if (!cfg.workingRtspPaths) cfg.workingRtspPaths = {};
+          // Extract the path portion only (strip protocol+auth+host) for portability
+          const urlObj = new URL(rtspUrl.replace(/^rtsp://[^@]+@/, "rtsp://x/").replace(/^rtsp://[^/]+/, "rtsp://x"));
+          cfg.workingRtspPaths[camera.ip] = urlObj.pathname + (urlObj.search || "");
+          fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+        } catch {}
         // Also do an immediate HLS-ready check (watcher may have fired already)
         if (!camera.hlsReady && fs.existsSync(hlsIndex)) {
           camera.hlsReady = true;
