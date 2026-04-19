@@ -312,6 +312,7 @@ ipcMain.handle("set-login-item", (_, enabled) => {
 });
 ipcMain.handle("test-camera",    (_, ip) => testCamera(ip));
 ipcMain.handle("open-relay-dir", () => { shell.openPath(RELAY_DIR); return true; });
+ipcMain.handle("open-help",      () => { shell.openExternal(WEB_APP_URL + "/camera-guide"); return true; });
 
 // ─── Network / pairing helpers ────────────────────────────────────────────────
 ipcMain.handle("get-pc-ips", () => {
