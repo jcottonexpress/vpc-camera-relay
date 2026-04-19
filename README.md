@@ -1,5 +1,9 @@
 # VP Chef Studio — Camera Relay
 
+> **Proprietary Software** — Copyright © 2026 VP Chef Studio / JCotton Express. All Rights Reserved.
+> Unauthorized copying, distribution, or modification of this software is strictly prohibited.
+> See [LICENSE](./LICENSE) for full terms.
+
 Desktop background app that connects your LaView IP cameras to the VP Chef Studio mobile app over your local WiFi network.
 
 ## Download
@@ -34,3 +38,12 @@ cd ../relay-desktop && npm install && npm run dist:win  # or dist:mac
 ```
 
 Requires Node.js 20+ and ffmpeg-static (installed automatically via npm).
+
+---
+
+## License
+
+This project is **proprietary and confidential**. Source code is made available for transparency and authorized evaluation only. No license is granted to copy, modify, distribute, sublicense, or use this software outside of an authorized VP Chef Studio account.
+
+Copyright © 2026 VP Chef Studio / JCotton Express. All Rights Reserved.
+
