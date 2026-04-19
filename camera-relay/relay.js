@@ -1778,17 +1778,117 @@ const localServer = http.createServer(async (req, res) => {
       online:    localFrames.has(c.ip),
       hlsReady:  !!c.hlsReady,
     }));
+    const nets3 = networkInterfaces();
+    const pcIps = [];
+    for (const n3 of Object.keys(nets3)) {
+      for (const iface of nets3[n3]) {
+        if ((iface.family === "IPv4" || iface.family === 4) && !iface.internal) pcIps.push(iface.address);
+      }
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       cameras,
       serverConnected: wsReady,
       recording:       recordingState.active,
+      pcIps,
     }));
     return;
   }
 
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("VP Chef Studio local relay — endpoints:\n  GET  /cam/probe\n  GET  /cam/snapshot?ip=\n  GET  /cam/stream?ip=\n  GET  /cam/hls/:slot/index.m3u8\n  GET  /status\n  POST /cam/record/start\n  POST /cam/record/stop\n  GET  /cam/record/status\n");
+  // GET /relay/info — Returns PC network IPs + port for mobile pairing
+  if (req.method === "GET" && reqPath === "/relay/info") {
+    const nets4 = networkInterfaces();
+    const pcIps4 = [];
+    for (const n4 of Object.keys(nets4)) {
+      for (const iface of nets4[n4]) {
+        if ((iface.family === "IPv4" || iface.family === 4) && !iface.internal) pcIps4.push(iface.address);
+      }
+    }
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+    res.end(JSON.stringify({ pcIps: pcIps4, port: LOCAL_SERVER_PORT, version: "1.1.0" }));
+    return;
+  }
+
+  // GET /cam/discover — Scan local subnet for devices answering on camera ports
+  // Returns within ~8 s for a /24 subnet. The mobile app calls this after entering the PC IP.
+  if (req.method === "GET" && reqPath === "/cam/discover") {
+    const nets5 = networkInterfaces();
+    const subnets = [];
+    for (const n5 of Object.keys(nets5)) {
+      for (const iface of nets5[n5]) {
+        if ((iface.family === "IPv4" || iface.family === 4) && !iface.internal) {
+          const parts = iface.address.split(".");
+          if (parts.length === 4) subnets.push(parts.slice(0, 3).join("."));
+        }
+      }
+    }
+    const uniqueSubnets = [...new Set(subnets)];
+    const portsToScan   = [5543, 8000, 554, 8554];
+    const TIMEOUT_MS    = 500;
+
+    const scanHost = (ip, port) => new Promise(resolve => {
+      const sock = new net.Socket();
+      let done = false;
+      sock.setTimeout(TIMEOUT_MS);
+      sock.once("connect", () => { done = true; sock.destroy(); resolve(true); });
+      sock.once("timeout", () => { if (!done) { done = true; sock.destroy(); resolve(false); } });
+      sock.once("error",   () => { if (!done) { done = true; resolve(false); } });
+      try { sock.connect(port, ip); } catch { resolve(false); }
+    });
+
+    const found = [];
+    for (const subnet of uniqueSubnets) {
+      const promises = [];
+      for (let i = 1; i <= 254; i++) {
+        const ip = `${subnet}.${i}`;
+        promises.push(
+          Promise.any(portsToScan.map(p =>
+            scanHost(ip, p).then(ok => { if (!ok) throw new Error("no"); return ip; })
+          )).then(ip2 => found.push(ip2)).catch(() => {})
+        );
+      }
+      await Promise.all(promises);
+    }
+
+    const existingIps = CAMERAS.map(c => c.ip);
+    const results = found.sort().map(ip => ({
+      ip,
+      configured:    existingIps.includes(ip),
+      suggestedSlot: (() => { const idx = existingIps.indexOf(ip); return idx >= 0 ? CAMERAS[idx].slot : null; })(),
+    }));
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ found: results, scannedSubnets: uniqueSubnets }));
+    return;
+  }
+
+  // POST /config/credentials — Update RTSP/ONVIF credentials without editing relay-config.json manually
+  if (req.method === "POST" && reqPath === "/config/credentials") {
+    try {
+      const body = await readJsonBody(req);
+      const configPath = path.join(__dirname, "relay-config.json");
+      let existing = {};
+      try { existing = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch {}
+      const updated = {
+        ...existing,
+        ...(body.rtspUser  !== undefined ? { rtspUser:  body.rtspUser  } : {}),
+        ...(body.rtspPass  !== undefined ? { rtspPass:  body.rtspPass  } : {}),
+        ...(body.onvifPass !== undefined ? { onvifPass: body.onvifPass } : {}),
+      };
+      fs.writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n");
+      if (body.rtspUser !== undefined) RTSP_USER = body.rtspUser;
+      if (body.rtspPass !== undefined) RTSP_PASS = body.rtspPass;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+
+    res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("VP Chef Studio local relay — endpoints:\n  GET  /cam/probe\n  GET  /cam/snapshot?ip=\n  GET  /cam/stream?ip=\n  GET  /cam/hls/:slot/index.m3u8\n  GET  /status\n  GET  /relay/info\n  GET  /cam/discover\n  POST /config/credentials\n  POST /cam/record/start\n  POST /cam/record/stop\n  GET  /cam/record/status\n");
 });
 
 localServer.listen(LOCAL_SERVER_PORT, "0.0.0.0", () => {
