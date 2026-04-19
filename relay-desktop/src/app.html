@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' http://localhost:8082 data: file:;">
+  <title>VP Chef Relay</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body   { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .body  { flex: 1; overflow-y: auto; }
+    .cam-label-row { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <img src="../assets/icon.png" alt="VP Chef Relay" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0;" />
+  <h1>VP Chef Relay</h1>
+  <span class="badge" id="server-badge">Stopped</span>
+  <span class="badge" id="rec-badge" style="display:none;">● REC</span>
+</div>
+
+<!-- Body -->
+<div class="body">
+
+  <!-- Camera grid -->
+  <div class="cam-grid" id="cam-grid">
+    <!-- Filled by JS -->
+  </div>
+
+  <div class="divider" style="margin: 0 18px;"></div>
+
+  <!-- Controls -->
+  <div style="padding: 12px 18px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <button class="btn primary" id="btn-start-stop" onclick="toggleRelay()">Start Relay</button>
+    <button class="btn ghost" onclick="window.relay.restart()">Restart</button>
+    <button class="btn ghost" onclick="window.relay.openWizard()">⚙ Camera Settings</button>
+    <label id="login-toggle" style="margin-left:auto;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;color:#888;">
+      <span id="login-toggle-track" onclick="toggleLoginItem()" style="
+        display:inline-block;width:30px;height:16px;border-radius:8px;
+        background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+        <span id="login-toggle-thumb" style="
+          position:absolute;top:2px;left:2px;width:12px;height:12px;
+          border-radius:50%;background:#888;transition:all 0.2s;"></span>
+      </span>
+      Start on Login
+    </label>
+    <button class="btn ghost" onclick="window.relay.openRelayDir()">Open Relay Folder</button>
+  </div>
+
+  <div class="divider" style="margin: 0 18px;"></div>
+
+  <!-- Log -->
+  <div style="padding: 10px 18px 6px;">
+    <div class="section-title">Live Log</div>
+  </div>
+  <div class="log-panel" id="log"></div>
+
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <div class="status-item">
+    <div class="dot" id="srv-dot"></div>
+    <span id="srv-label">Relay stopped</span>
+  </div>
+  <div class="status-item">
+    <div class="dot" id="cam-dot"></div>
+    <span id="cam-label">No cameras</span>
+  </div>
+</div>
+
+<script>
+let state = { running: false, serverConnected: false, cameras: [], recording: false };
+let relayRunning = false;
+
+const DEFAULT_CAMERAS = [
+  { slot: 1, label: "Performance Cam", ip: "192.168.1.177", frames: 0, connected: false },
+  { slot: 2, label: "Food Prep Cam",   ip: "192.168.1.178", frames: 0, connected: false },
+  { slot: 3, label: "Stovetop Cam",    ip: "192.168.1.179", frames: 0, connected: false },
+];
+
+let loginItemEnabled = false;
+
+async function init() {
+  state = await window.relay.getStatus();
+  loginItemEnabled = await window.relay.getLoginItem();
+  renderAll();
+  renderLoginToggle();
+
+  window.relay.onStatus(s => { state = s; renderAll(); });
+  window.relay.onLogHistory(lines => {
+    const el = document.getElementById("log");
+    el.innerHTML = "";
+    lines.forEach(l => appendLog(l));
+  });
+  window.relay.onLog(line => appendLog(line));
+}
+
+async function toggleLoginItem() {
+  loginItemEnabled = !loginItemEnabled;
+  await window.relay.setLoginItem(loginItemEnabled);
+  renderLoginToggle();
+}
+
+function renderLoginToggle() {
+  const track = document.getElementById("login-toggle-track");
+  const thumb = document.getElementById("login-toggle-thumb");
+  if (!track || !thumb) return;
+  track.style.background = loginItemEnabled ? "#22c55e" : "#333";
+  thumb.style.left        = loginItemEnabled ? "16px"   : "2px";
+  thumb.style.background  = loginItemEnabled ? "#fff"   : "#888";
+}
+
+function renderAll() {
+  renderServerBadge();
+  renderCamGrid();
+  renderStatusBar();
+  renderStartStop();
+}
+
+function renderServerBadge() {
+  const badge = document.getElementById("server-badge");
+  const recBadge = document.getElementById("rec-badge");
+
+  if (!state.running) {
+    badge.textContent = "Stopped";
+    badge.className   = "badge stopped";
+  } else if (state.serverConnected) {
+    badge.textContent = "Connected";
+    badge.className   = "badge connected";
+  } else {
+    badge.textContent = "Connecting…";
+    badge.className   = "badge";
+  }
+
+  recBadge.style.display = state.recording ? "" : "none";
+  if (state.recording) {
+    recBadge.textContent = "● REC";
+    recBadge.className   = "badge recording";
+  }
+}
+
+function renderCamGrid() {
+  const cams = state.cameras?.length ? state.cameras : DEFAULT_CAMERAS;
+  const grid = document.getElementById("cam-grid");
+  grid.innerHTML = "";
+  cams.forEach(cam => {
+    const online = cam.connected;
+    const card = document.createElement("div");
+    card.className = `cam-card ${online ? "online" : "offline"}`;
+
+    const snapshotUrl = `http://localhost:8082/cam/snapshot?ip=${cam.ip}&t=${Date.now()}`;
+
+    card.innerHTML = `
+      <div class="cam-preview" id="prev-${cam.slot}">
+        ${online ? `<img src="${snapshotUrl}" alt="CAM${cam.slot}" onerror="this.parentElement.innerHTML='<span>No signal</span>'" />` : "<span>No signal</span>"}
+      </div>
+      <div class="cam-info">
+        <div class="cam-dot ${online ? "on" : "off"}"></div>
+        <div class="cam-label-row">
+          <span class="cam-label">CAM ${cam.slot} — ${cam.label}</span>
+        </div>
+        <span class="cam-frames">${cam.frames ? cam.frames + " fr" : ""}</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function renderStatusBar() {
+  const srvDot   = document.getElementById("srv-dot");
+  const srvLabel = document.getElementById("srv-label");
+  const camDot   = document.getElementById("cam-dot");
+  const camLabel = document.getElementById("cam-label");
+
+  if (!state.running) {
+    srvDot.className   = "dot";
+    srvLabel.textContent = "Relay stopped";
+  } else if (state.serverConnected) {
+    srvDot.className   = "dot green";
+    srvLabel.textContent = "Cloud server connected";
+  } else {
+    srvDot.className   = "dot yellow";
+    srvLabel.textContent = "Connecting to cloud…";
+  }
+
+  const onlineCams = (state.cameras || []).filter(c => c.connected).length;
+  const total      = (state.cameras || DEFAULT_CAMERAS).length;
+  camDot.className   = onlineCams > 0 ? "dot green" : "dot";
+  camLabel.textContent = onlineCams > 0
+    ? `${onlineCams}/${total} cameras online`
+    : "No cameras online";
+}
+
+function renderStartStop() {
+  const btn = document.getElementById("btn-start-stop");
+  btn.textContent = state.running ? "Stop Relay" : "Start Relay";
+  btn.className   = state.running ? "btn danger" : "btn primary";
+}
+
+function toggleRelay() {
+  if (state.running) {
+    window.relay.stop();
+  } else {
+    window.relay.start();
+  }
+}
+
+function appendLog(line) {
+  const el = document.getElementById("log");
+  const div = document.createElement("div");
+  line = line || "";
+  div.className = line.includes("✓") || line.includes("[ws] ✓") ? "line-ok"
+    : line.includes("[err]") || line.includes("ERROR") || line.includes("✗") ? "line-err"
+    : line.includes("WARN") || line.includes("warn") ? "line-warn"
+    : line.includes("[setup]") || line.includes("Installing") ? "line-info"
+    : "";
+  div.textContent = line;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  // Keep log manageable
+  while (el.children.length > 250) el.removeChild(el.firstChild);
+}
+
+// Refresh snapshots every 3s when cameras are online
+setInterval(() => {
+  const cams = state.cameras?.filter(c => c.connected) || [];
+  cams.forEach(cam => {
+    const prev = document.getElementById(`prev-${cam.slot}`);
+    if (!prev) return;
+    const img = prev.querySelector("img");
+    if (img) img.src = `http://localhost:8082/cam/snapshot?ip=${cam.ip}&t=${Date.now()}`;
+  });
+}, 3000);
+
+init();
+</script>
+</body>
+</html>
