@@ -85,19 +85,19 @@ function getBundledFfmpeg() {
 function startRelay() {
   if (relayProc) return;
 
-  const nodeBin = process.platform === "win32" ? "node.exe" : "node";
-
+  // Use Electron's own bundled Node.js runtime (ELECTRON_RUN_AS_NODE=1).
+  // This avoids requiring a separate system-installed node.exe on the user's PC.
   const relayScript = (relayJsOverride && fs.existsSync(relayJsOverride))
     ? relayJsOverride
     : RELAY_JS;
 
   const ffmpegPath = getBundledFfmpeg();
-  const relayEnv = { ...process.env };
+  const relayEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
   if (ffmpegPath && fs.existsSync(ffmpegPath)) {
     relayEnv.FFMPEG_PATH = ffmpegPath;
   }
 
-  relayProc = spawn(nodeBin, [relayScript], {
+  relayProc = spawn(process.execPath, [relayScript], {
     cwd: RELAY_DIR,
     env: relayEnv,
     stdio: ["ignore", "pipe", "pipe"],
