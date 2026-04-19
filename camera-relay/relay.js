@@ -369,13 +369,19 @@ async function uploadRelaySession(title, durationSec, authToken) {
 // ─── MP4 Video recording helpers ─────────────────────────────────────────────
 // Each camera gets its own dedicated FFmpeg process recording directly to disk.
 // This runs in PARALLEL with the always-on HLS/preview FFmpeg process.
-// Files land in %TEMP%\vpchef-recordings\<sessionId>\cam<slot>.mp4
+// Files land in ~/Documents/VP Chef Studio/<sessionTitle>-<sessionId>/cam<slot>.mp4
 
-const RECORDINGS_BASE = path.join(os.tmpdir(), "vpchef-recordings");
+const RECORDINGS_BASE = path.join(os.homedir(), "Documents", "VP Chef Studio");
 
-function startVideoRecording(sessionId) {
+function startVideoRecording(sessionId, title) {
   try { fs.mkdirSync(RECORDINGS_BASE, { recursive: true }); } catch {}
-  const recDir = path.join(RECORDINGS_BASE, sessionId);
+  const safeTitle = (title || "Session")
+    .replace(/[^a-zA-Z0-9 _-]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .slice(0, 60);
+  const folderName = safeTitle ? `${safeTitle}-${sessionId}` : sessionId;
+  const recDir = path.join(RECORDINGS_BASE, folderName);
   try { fs.mkdirSync(recDir, { recursive: true }); } catch {}
   recordingState.recordingDir = recDir;
   recordingState.videoProcs   = {};
@@ -568,7 +574,7 @@ function connectWs() {
         }));
         console.log(`[ws] ▶ record-start: "${recordingState.title}" (session ${sessionId}) — cameras: ${JSON.stringify(camStatus)}`);
         // Start a dedicated FFmpeg process per camera to record full-rate MP4
-        startVideoRecording(sessionId);
+        startVideoRecording(sessionId, recordingState.title);
         ws.send(JSON.stringify({ type: "relay-recording-started", cameras: camStatus }));
         return;
       }
