@@ -34,6 +34,13 @@ jobs:
       - name: Install relay-desktop dependencies
         run: cd relay-desktop && npm install
 
+      - name: Bundle portable Node.js for relay
+        shell: bash
+        run: |
+          curl -fsSL https://nodejs.org/dist/v20.18.3/node-v20.18.3-win-x64.zip -o /tmp/node.zip
+          unzip -j /tmp/node.zip "node-v20.18.3-win-x64/node.exe" -d relay-desktop/bin
+          echo "Bundled node.exe: $(ls -lh relay-desktop/bin/node.exe)"
+
       - name: Build Windows installer
         run: cd relay-desktop && npm run dist:win
         env:
