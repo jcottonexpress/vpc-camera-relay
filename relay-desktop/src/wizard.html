@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <title>VP Chef Relay — Setup</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    .wizard-wrap { flex: 1; }
+  </style>
+</head>
+<body>
+<div class="wizard-wrap" id="wizard">
+
+  <!-- Step 1: Welcome -->
+  <div class="wizard-step active" id="step-1">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:6px;">
+      <img src="../assets/icon.png" alt="VP Chef Relay" style="width:80px;height:80px;border-radius:18px;object-fit:cover;" />
+    </div>
+    <div class="step-num" style="text-align:center;">Step 1 of 4</div>
+    <div class="step-header" style="text-align:center;">
+      <h2>Welcome to VP Chef Relay</h2>
+      <p>This app runs on your PC and connects your IP cameras to the VP Chef Studio mobile app. Let's get your cameras configured — it only takes two minutes.</p>
+    </div>
+    <div class="info-box">
+      <strong>What this app does:</strong><br>
+      Runs in your system tray, reads live video from your IP cameras over your local WiFi network, and streams footage to the VP Chef Studio cloud so you can control recordings from your phone.
+    </div>
+    <div class="info-box" style="border-color:#1d4ed8; background:#0f172a;">
+      <strong>Requirements:</strong><br>
+      • Node.js installed on this PC<br>
+      • IP cameras on the same WiFi network<br>
+      • FFmpeg installed (or placed in the relay folder)
+    </div>
+    <div class="row-actions" style="margin-top:auto;">
+      <button class="btn primary" onclick="goStep(2)">Get Started →</button>
+    </div>
+    <div class="progress-dots">
+      <span class="active" id="dot-1"></span>
+      <span id="dot-2"></span><span id="dot-3"></span><span id="dot-4"></span>
+    </div>
+  </div>
+
+  <!-- Step 2: Camera IPs -->
+  <div class="wizard-step" id="step-2">
+    <div class="step-num">Step 2 of 4</div>
+    <div class="step-header">
+      <h2>Configure Your Cameras</h2>
+      <p>Enter the local IP address for each camera. You can find the IP in your router's device list or the camera's own app. Click Test to verify each one is reachable.</p>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="cam-row">
+        <label>CAM 1</label>
+        <input type="text" id="cam1-ip"    placeholder="192.168.1.177" />
+        <input type="text" id="cam1-label" placeholder="Performance Cam" style="max-width:130px;" />
+        <button class="btn ghost sm" onclick="testCam(1)">Test</button>
+        <span class="test-badge" id="cam1-badge"></span>
+      </div>
+      <div class="cam-row">
+        <label>CAM 2</label>
+        <input type="text" id="cam2-ip"    placeholder="192.168.1.178" />
+        <input type="text" id="cam2-label" placeholder="Food Prep Cam" style="max-width:130px;" />
+        <button class="btn ghost sm" onclick="testCam(2)">Test</button>
+        <span class="test-badge" id="cam2-badge"></span>
+      </div>
+      <div class="cam-row">
+        <label>CAM 3</label>
+        <input type="text" id="cam3-ip"    placeholder="192.168.1.179" />
+        <input type="text" id="cam3-label" placeholder="Stovetop Cam" style="max-width:130px;" />
+        <button class="btn ghost sm" onclick="testCam(3)">Test</button>
+        <span class="test-badge" id="cam3-badge"></span>
+      </div>
+    </div>
+
+    <div class="info-box" style="font-size:11px;">
+      Cameras that can't be reached will still be saved — they'll show as offline in the dashboard until they come online.
+    </div>
+
+    <div class="row-actions" style="margin-top:auto;">
+      <button class="btn ghost" onclick="goStep(1)">← Back</button>
+      <button class="btn primary" onclick="goStep(3)">Next →</button>
+    </div>
+    <div class="progress-dots">
+      <span class="done" id="dot-1b"></span>
+      <span class="active"></span><span></span><span></span>
+    </div>
+  </div>
+
+  <!-- Step 3: Credentials -->
+  <div class="wizard-step" id="step-3">
+    <div class="step-num">Step 3 of 4</div>
+    <div class="step-header">
+      <h2>Camera Credentials</h2>
+      <p>Most IP cameras require a username and password to access the video stream (RTSP). Enter the credentials set in your camera's admin panel. The default is often <strong>admin / admin</strong> or blank.</p>
+    </div>
+
+    <div class="field-group">
+      <label>RTSP Username</label>
+      <input type="text" id="rtsp-user" placeholder="admin" />
+    </div>
+    <div class="field-group">
+      <label>RTSP Password</label>
+      <input type="password" id="rtsp-pass" placeholder="Leave blank if no password" />
+    </div>
+    <div class="field-group">
+      <label>ONVIF Password <span style="color:#555;font-weight:400;">(usually same as RTSP)</span></label>
+      <input type="password" id="onvif-pass" placeholder="Same as RTSP password" />
+    </div>
+
+    <div class="info-box" style="font-size:11px;">
+      These credentials are stored locally in <strong>relay-config.json</strong> next to the relay program — they are never sent to the cloud.
+    </div>
+
+    <div class="row-actions" style="margin-top:auto;">
+      <button class="btn ghost" onclick="goStep(2)">← Back</button>
+      <button class="btn primary" onclick="goStep(4)">Next →</button>
+    </div>
+    <div class="progress-dots">
+      <span class="done"></span><span class="done"></span><span class="active"></span><span></span>
+    </div>
+  </div>
+
+  <!-- Step 4: Done -->
+  <div class="wizard-step" id="step-4">
+    <div class="step-num">Step 4 of 4</div>
+    <div class="step-header">
+      <h2>Ready to Go!</h2>
+      <p>Your configuration has been saved. Click <strong>Start Relay</strong> to launch the camera relay. It will run in your system tray and connect automatically to your cameras.</p>
+    </div>
+
+    <div class="info-box" style="border-color:#14532d;background:#052e16;">
+      <strong>✓ Cameras configured</strong><br>
+      <span id="cam-summary" style="color:#86efac;font-size:11px;"></span>
+    </div>
+
+    <div class="info-box">
+      <strong>Next step — mobile app:</strong><br>
+      Open VP Chef Studio on your phone, go to <strong>Settings → Camera Setup</strong>, and enter this PC's IP address (<code id="pc-ip-hint" style="color:#93c5fd;">192.168.x.x</code>) to complete the connection.
+    </div>
+
+    <div class="info-box" style="font-size:11px;">
+      The relay starts automatically when you open this app in the future. You can control it from the system tray icon at any time.
+    </div>
+
+    <div class="row-actions" style="margin-top:auto;">
+      <button class="btn ghost" onclick="goStep(3)">← Back</button>
+      <button class="btn success" onclick="finish()">▶ Start Relay</button>
+    </div>
+    <div class="progress-dots">
+      <span class="done"></span><span class="done"></span><span class="done"></span><span class="active"></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let currentStep = 1;
+
+async function init() {
+  const cfg = await window.relay.getConfig();
+  if (cfg.cameras && cfg.cameras.length >= 3) {
+    document.getElementById("cam1-ip").value    = cfg.cameras[0]?.ip    || "";
+    document.getElementById("cam1-label").value = cfg.cameras[0]?.label || "";
+    document.getElementById("cam2-ip").value    = cfg.cameras[1]?.ip    || "";
+    document.getElementById("cam2-label").value = cfg.cameras[1]?.label || "";
+    document.getElementById("cam3-ip").value    = cfg.cameras[2]?.ip    || "";
+    document.getElementById("cam3-label").value = cfg.cameras[2]?.label || "";
+  }
+  if (cfg.rtspUser)  document.getElementById("rtsp-user").value  = cfg.rtspUser;
+  if (cfg.rtspPass)  document.getElementById("rtsp-pass").value  = cfg.rtspPass;
+  if (cfg.onvifPass) document.getElementById("onvif-pass").value = cfg.onvifPass;
+}
+
+function goStep(n) {
+  document.getElementById(`step-${currentStep}`).classList.remove("active");
+  document.getElementById(`step-${n}`).classList.add("active");
+  currentStep = n;
+  if (n === 4) updateSummary();
+}
+
+async function testCam(slot) {
+  const ip    = document.getElementById(`cam${slot}-ip`).value.trim();
+  const badge = document.getElementById(`cam${slot}-badge`);
+  if (!ip) return;
+  badge.textContent = "…";
+  badge.className = "test-badge testing";
+  const result = await window.relay.testCamera(ip);
+  badge.textContent = result.ok ? "✓ Online" : "✗ Offline";
+  badge.className   = result.ok ? "test-badge ok" : "test-badge fail";
+}
+
+function updateSummary() {
+  const cams = [1,2,3].map(i => {
+    const ip    = document.getElementById(`cam${i}-ip`).value.trim() || `192.168.1.17${i+6}`;
+    const label = document.getElementById(`cam${i}-label`).value.trim() || `Camera ${i}`;
+    return `CAM${i}: ${label} (${ip})`;
+  });
+  document.getElementById("cam-summary").textContent = cams.join(" · ");
+}
+
+async function finish() {
+  const cfg = {
+    rtspUser:  document.getElementById("rtsp-user").value.trim() || "admin",
+    rtspPass:  document.getElementById("rtsp-pass").value,
+    onvifPass: document.getElementById("onvif-pass").value ||
+               document.getElementById("rtsp-pass").value,
+    cameras: [1,2,3].map(i => ({
+      slot:  i,
+      ip:    document.getElementById(`cam${i}-ip`).value.trim() || `192.168.1.17${i+6}`,
+      label: document.getElementById(`cam${i}-label`).value.trim() || `Camera ${i}`,
+    })),
+  };
+  await window.relay.wizardDone(cfg);
+}
+
+init();
+</script>
+</body>
+</html>
