@@ -1,6 +1,6 @@
 {
   "name": "vp-chef-relay-desktop",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "VP Chef Studio — Camera Relay Desktop Companion",
   "main": "main.js",
   "author": "VP Chef Studio",
@@ -39,7 +39,8 @@
         "to": "relay",
         "filter": [
           "relay.js",
-          "package.json"
+          "package.json",
+          "node_modules/**"
         ]
       },
       {
