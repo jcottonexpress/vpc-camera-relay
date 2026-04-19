@@ -539,7 +539,6 @@ function connectWs() {
   ws.on("open", () => {
     console.log("[ws] Connected to VP Chef Studio cloud server.");
     ws.send(JSON.stringify({ type: "register", ips: CAMERAS.map(c => c.ip), token: RELAY_TOKEN || undefined }));
-    startHeartbeatTimer(); // begin HTTP heartbeat pings so all autoscale instances see us
   });
 
   ws.on("message", (data) => {
@@ -680,7 +679,8 @@ function connectWs() {
 
   ws.on("close", (code) => {
     wsReady = false;
-    stopHeartbeatTimer();
+    // Do NOT stop heartbeatTimer here — heartbeats run independently so the
+    // server sees us as online even during the 5-second WS reconnect window.
     console.log(`[ws] Disconnected (code ${code}). Reconnecting in ${RECONNECT_MS / 1000}s…`);
     setTimeout(connectWs, RECONNECT_MS);
   });
@@ -1935,6 +1935,8 @@ CAMERAS.forEach(c => console.log(`  Camera : ${c.label}  (${c.ip})`));
 }
 console.log("");
 
+sendHttpHeartbeat(); // send immediately on startup
+startHeartbeatTimer();  // independent of WebSocket
 connectWs();
 runNetworkCheck().then(() => CAMERAS.forEach(c => startCamera(c)));
 
