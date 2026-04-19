@@ -8,6 +8,13 @@
   <style>
     body { display: flex; flex-direction: column; min-height: 100vh; }
     .wizard-wrap { flex: 1; }
+    .scan-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+    .scan-result { font-size:11px; color:#888; margin-top:4px; }
+    .scan-result.found { color:#22c55e; }
+    .scan-result.err   { color:#e63946; }
+    .pairing-box { background:#0f1a2e; border:1px solid #1d4ed8; border-radius:10px; padding:14px; margin-top:10px; }
+    .pairing-box h4 { color:#93c5fd; margin:0 0 8px; font-size:13px; }
+    .ip-pill { display:inline-block; background:#1e3a5f; color:#93c5fd; border-radius:6px; padding:4px 10px; font-size:14px; font-weight:700; font-family:monospace; margin:2px 3px; }
   </style>
 </head>
 <body>
@@ -21,17 +28,17 @@
     <div class="step-num" style="text-align:center;">Step 1 of 4</div>
     <div class="step-header" style="text-align:center;">
       <h2>Welcome to VP Chef Relay</h2>
-      <p>This app runs on your PC and connects your IP cameras to the VP Chef Studio mobile app. Let's get your cameras configured — it only takes two minutes.</p>
+      <p>This app runs on your PC and connects your IP cameras to the VP Chef Studio mobile app. Setup only takes two minutes.</p>
     </div>
     <div class="info-box">
       <strong>What this app does:</strong><br>
-      Runs in your system tray, reads live video from your IP cameras over your local WiFi network, and streams footage to the VP Chef Studio cloud so you can control recordings from your phone.
+      Runs silently in your system tray, reads live video from your IP cameras over your local WiFi, and sends footage to VP Chef Studio so you can control recordings from your phone.
     </div>
     <div class="info-box" style="border-color:#1d4ed8; background:#0f172a;">
-      <strong>Requirements:</strong><br>
-      • Node.js installed on this PC<br>
-      • IP cameras on the same WiFi network<br>
-      • FFmpeg installed (or placed in the relay folder)
+      <strong>You'll need:</strong><br>
+      • Your IP cameras connected to the same WiFi as this PC<br>
+      • The cameras' RTSP password (check the camera app or label)<br>
+      • The VP Chef Studio app open on your phone
     </div>
     <div class="row-actions" style="margin-top:auto;">
       <button class="btn primary" onclick="goStep(2)">Get Started →</button>
@@ -46,8 +53,13 @@
   <div class="wizard-step" id="step-2">
     <div class="step-num">Step 2 of 4</div>
     <div class="step-header">
-      <h2>Configure Your Cameras</h2>
-      <p>Enter the local IP address for each camera. You can find the IP in your router's device list or the camera's own app. Click Test to verify each one is reachable.</p>
+      <h2>Find Your Cameras</h2>
+      <p>Tap <strong>Scan Network</strong> to automatically find cameras on your WiFi — or enter each IP address manually if you already know them.</p>
+    </div>
+
+    <div class="scan-row">
+      <button class="btn primary" id="scan-btn" onclick="scanNetwork()">🔍 Scan Network for Cameras</button>
+      <span class="scan-result" id="scan-status"></span>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:8px;">
@@ -74,8 +86,9 @@
       </div>
     </div>
 
-    <div class="info-box" style="font-size:11px;">
-      Cameras that can't be reached will still be saved — they'll show as offline in the dashboard until they come online.
+    <div class="info-box" style="font-size:11px;margin-top:8px;">
+      Can't find your cameras? Make sure they're on <strong>2.4 GHz WiFi</strong> (not 5 GHz) and powered on.
+      Cameras that can't be reached will still be saved — they'll show as offline until they come online.
     </div>
 
     <div class="row-actions" style="margin-top:auto;">
@@ -83,8 +96,8 @@
       <button class="btn primary" onclick="goStep(3)">Next →</button>
     </div>
     <div class="progress-dots">
-      <span class="done" id="dot-1b"></span>
-      <span class="active"></span><span></span><span></span>
+      <span id="dot-1"></span><span class="active" id="dot-2"></span>
+      <span id="dot-3"></span><span id="dot-4"></span>
     </div>
   </div>
 
@@ -92,25 +105,23 @@
   <div class="wizard-step" id="step-3">
     <div class="step-num">Step 3 of 4</div>
     <div class="step-header">
-      <h2>Camera Credentials</h2>
-      <p>Most IP cameras require a username and password to access the video stream (RTSP). Enter the credentials set in your camera's admin panel. The default is often <strong>admin / admin</strong> or blank.</p>
+      <h2>Camera Password</h2>
+      <p>Enter the RTSP password for your cameras. This is usually set during camera setup in the camera's app. If you haven't changed it, try leaving it blank or use the default from the camera label.</p>
     </div>
 
-    <div class="field-group">
-      <label>RTSP Username</label>
-      <input type="text" id="rtsp-user" placeholder="admin" />
-    </div>
-    <div class="field-group">
-      <label>RTSP Password</label>
-      <input type="password" id="rtsp-pass" placeholder="Leave blank if no password" />
-    </div>
-    <div class="field-group">
-      <label>ONVIF Password <span style="color:#555;font-weight:400;">(usually same as RTSP)</span></label>
-      <input type="password" id="onvif-pass" placeholder="Same as RTSP password" />
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label class="field-label">Username</label>
+        <input type="text" id="rtsp-user" placeholder="admin" value="admin" />
+      </div>
+      <div>
+        <label class="field-label">Password <span style="color:#888;font-weight:400;">(RTSP / camera login)</span></label>
+        <input type="password" id="rtsp-pass" placeholder="Leave blank if no password" />
+      </div>
     </div>
 
-    <div class="info-box" style="font-size:11px;">
-      These credentials are stored locally in <strong>relay-config.json</strong> next to the relay program — they are never sent to the cloud.
+    <div class="info-box" style="margin-top:12px; font-size:11px;">
+      💡 For LaView cameras: the password is whatever you set in the LaView app during initial camera setup. It's <em>not</em> your WiFi password.
     </div>
 
     <div class="row-actions" style="margin-top:auto;">
@@ -118,38 +129,44 @@
       <button class="btn primary" onclick="goStep(4)">Next →</button>
     </div>
     <div class="progress-dots">
-      <span class="done"></span><span class="done"></span><span class="active"></span><span></span>
+      <span id="dot-1"></span><span id="dot-2"></span>
+      <span class="active" id="dot-3"></span><span id="dot-4"></span>
     </div>
   </div>
 
-  <!-- Step 4: Done -->
+  <!-- Step 4: Confirm + Pair -->
   <div class="wizard-step" id="step-4">
     <div class="step-num">Step 4 of 4</div>
     <div class="step-header">
-      <h2>Ready to Go!</h2>
-      <p>Your configuration has been saved. Click <strong>Start Relay</strong> to launch the camera relay. It will run in your system tray and connect automatically to your cameras.</p>
+      <h2>Almost Done!</h2>
+      <p>Review your settings, then tap <strong>Launch Relay</strong>. The relay will start in your system tray and connect automatically.</p>
     </div>
 
-    <div class="info-box" style="border-color:#14532d;background:#052e16;">
-      <strong>✓ Cameras configured</strong><br>
-      <span id="cam-summary" style="color:#86efac;font-size:11px;"></span>
+    <div class="info-box" style="font-size:12px;" id="cam-summary-box">
+      Loading…
     </div>
 
-    <div class="info-box">
-      <strong>Next step — mobile app:</strong><br>
-      Open VP Chef Studio on your phone, go to <strong>Settings → Camera Setup</strong>, and enter this PC's IP address (<code id="pc-ip-hint" style="color:#93c5fd;">192.168.x.x</code>) to complete the connection.
-    </div>
-
-    <div class="info-box" style="font-size:11px;">
-      The relay starts automatically when you open this app in the future. You can control it from the system tray icon at any time.
+    <!-- Phone pairing -->
+    <div class="pairing-box" id="pairing-box">
+      <h4>📱 Connect Your Phone</h4>
+      <p style="font-size:11px;color:#888;margin:0 0 8px;">
+        Once the relay is running, open the VP Chef Studio app on your phone → Settings → Camera Relay Setup → enter one of these IP addresses:
+      </p>
+      <div id="pc-ip-list" style="margin-bottom:6px;">
+        <span style="color:#555;font-size:11px;">Loading…</span>
+      </div>
+      <p style="font-size:10px;color:#666;margin:0;">
+        Make sure your phone is on the same WiFi network as this PC.
+      </p>
     </div>
 
     <div class="row-actions" style="margin-top:auto;">
       <button class="btn ghost" onclick="goStep(3)">← Back</button>
-      <button class="btn success" onclick="finish()">▶ Start Relay</button>
+      <button class="btn primary" onclick="finish()">🚀 Launch Relay</button>
     </div>
     <div class="progress-dots">
-      <span class="done"></span><span class="done"></span><span class="done"></span><span class="active"></span>
+      <span id="dot-1"></span><span id="dot-2"></span>
+      <span id="dot-3"></span><span class="active" id="dot-4"></span>
     </div>
   </div>
 
@@ -157,27 +174,95 @@
 
 <script>
 let currentStep = 1;
+let discoveredIps = [];
 
 async function init() {
   const cfg = await window.relay.getConfig();
-  if (cfg.cameras && cfg.cameras.length >= 3) {
-    document.getElementById("cam1-ip").value    = cfg.cameras[0]?.ip    || "";
-    document.getElementById("cam1-label").value = cfg.cameras[0]?.label || "";
-    document.getElementById("cam2-ip").value    = cfg.cameras[1]?.ip    || "";
-    document.getElementById("cam2-label").value = cfg.cameras[1]?.label || "";
-    document.getElementById("cam3-ip").value    = cfg.cameras[2]?.ip    || "";
-    document.getElementById("cam3-label").value = cfg.cameras[2]?.label || "";
+  if (cfg.cameras) {
+    cfg.cameras.forEach(c => {
+      const ip = document.getElementById(`cam${c.slot}-ip`);
+      const lb = document.getElementById(`cam${c.slot}-label`);
+      if (ip) ip.value = c.ip || "";
+      if (lb) lb.value = c.label || "";
+    });
   }
   if (cfg.rtspUser)  document.getElementById("rtsp-user").value  = cfg.rtspUser;
   if (cfg.rtspPass)  document.getElementById("rtsp-pass").value  = cfg.rtspPass;
-  if (cfg.onvifPass) document.getElementById("onvif-pass").value = cfg.onvifPass;
+  // Load PC IPs for the pairing panel
+  loadPcIps();
+}
+
+async function loadPcIps() {
+  try {
+    const ips = await window.relay.getPcIps();
+    discoveredIps = ips;
+    renderPcIps(ips);
+  } catch {}
+}
+
+function renderPcIps(ips) {
+  const el = document.getElementById("pc-ip-list");
+  if (!el) return;
+  if (!ips || ips.length === 0) {
+    el.innerHTML = '<span style="color:#555;font-size:11px;">Could not detect PC IP — check your WiFi connection.</span>';
+    return;
+  }
+  el.innerHTML = ips.map(ip => `<span class="ip-pill">${ip}</span>`).join(" ");
 }
 
 function goStep(n) {
   document.getElementById(`step-${currentStep}`).classList.remove("active");
   document.getElementById(`step-${n}`).classList.add("active");
+  // Update dots
+  [1,2,3,4].forEach(i => {
+    const d = document.getElementById(`dot-${i}`);
+    if (d) d.className = i === n ? "active" : "";
+  });
   currentStep = n;
   if (n === 4) updateSummary();
+}
+
+async function scanNetwork() {
+  const btn    = document.getElementById("scan-btn");
+  const status = document.getElementById("scan-status");
+  btn.disabled = true;
+  btn.textContent = "⏳ Scanning…";
+  status.textContent = "Scanning your network — this takes about 8 seconds…";
+  status.className = "scan-result";
+  try {
+    const result = await window.relay.discoverCameras();
+    if (!result || result.error) throw new Error(result?.error || "Scan failed");
+    const found = result.found || [];
+    if (found.length === 0) {
+      status.textContent = "No cameras found. Try entering IPs manually.";
+      status.className = "scan-result err";
+    } else {
+      // Auto-assign IPs to slots in order
+      found.forEach((cam, idx) => {
+        const slot = cam.suggestedSlot || (idx + 1);
+        if (slot >= 1 && slot <= 3) {
+          const ipEl = document.getElementById(`cam${slot}-ip`);
+          if (ipEl && !ipEl.value) ipEl.value = cam.ip;
+        }
+      });
+      // Fill remaining slots in order
+      let nextSlot = 1;
+      found.forEach(cam => {
+        while (nextSlot <= 3) {
+          const ipEl = document.getElementById(`cam${nextSlot}-ip`);
+          if (ipEl && !ipEl.value) { ipEl.value = cam.ip; nextSlot++; break; }
+          nextSlot++;
+        }
+      });
+      status.textContent = `✓ Found ${found.length} device${found.length !== 1 ? "s" : ""} — IPs filled in above.`;
+      status.className = "scan-result found";
+    }
+  } catch (e) {
+    status.textContent = "Scan failed: " + e.message;
+    status.className = "scan-result err";
+  }
+  btn.disabled = false;
+  btn.textContent = "🔍 Scan Network for Cameras";
 }
 
 async function testCam(slot) {
@@ -197,15 +282,22 @@ function updateSummary() {
     const label = document.getElementById(`cam${i}-label`).value.trim() || `Camera ${i}`;
     return `CAM${i}: ${label} (${ip})`;
   });
-  document.getElementById("cam-summary").textContent = cams.join(" · ");
+  const box = document.getElementById("cam-summary-box");
+  if (box) {
+    const pass = document.getElementById("rtsp-pass").value;
+    box.innerHTML = `<strong>Cameras:</strong><br>${cams.join("<br>")}<br><br>` +
+      `<strong>RTSP User:</strong> ${document.getElementById("rtsp-user").value || "admin"}&nbsp;&nbsp;` +
+      `<strong>Password:</strong> ${pass ? "●●●●●●" : "(none)"}`;
+  }
+  // Refresh PC IPs
+  loadPcIps();
 }
 
 async function finish() {
   const cfg = {
     rtspUser:  document.getElementById("rtsp-user").value.trim() || "admin",
     rtspPass:  document.getElementById("rtsp-pass").value,
-    onvifPass: document.getElementById("onvif-pass").value ||
-               document.getElementById("rtsp-pass").value,
+    onvifPass: document.getElementById("rtsp-pass").value,
     cameras: [1,2,3].map(i => ({
       slot:  i,
       ip:    document.getElementById(`cam${i}-ip`).value.trim() || `192.168.1.17${i+6}`,
