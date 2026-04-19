@@ -1,0 +1,91 @@
+{
+  "name": "vp-chef-relay-desktop",
+  "version": "1.0.0",
+  "description": "VP Chef Studio — Camera Relay Desktop Companion",
+  "main": "main.js",
+  "author": "VP Chef Studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jcottonexpress/vpc-camera-relay.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist": "electron-builder --win --mac"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "build": {
+    "appId": "com.vpchef.relay",
+    "productName": "VP Chef Relay",
+    "copyright": "VP Chef Studio",
+    "publish": {
+      "provider": "github",
+      "owner": "jcottonexpress",
+      "repo": "vpc-camera-relay"
+    },
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "bin/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "../camera-relay",
+        "to": "relay",
+        "filter": [
+          "relay.js",
+          "package.json"
+        ]
+      },
+      {
+        "from": "bin",
+        "to": "bin"
+      }
+    ],
+    "icon": "assets/icon.png",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1"
+  }
+}
