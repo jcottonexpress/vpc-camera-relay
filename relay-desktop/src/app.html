@@ -51,6 +51,22 @@
 
   <div class="divider" style="margin: 0 18px;"></div>
 
+  <!-- Phone Pairing -->
+  <div style="padding: 10px 18px 4px;">
+    <div class="section-title">📱 Connect Your Phone</div>
+    <div id="pairing-panel" style="margin-top:6px;">
+      <p style="font-size:11px;color:#888;margin:0 0 6px;">
+        Open <strong>VP Chef Studio</strong> on your phone → Settings → Camera Relay Setup → enter this PC's IP:
+      </p>
+      <div id="pc-ips-display" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+        <span style="color:#555;font-size:11px;">Loading…</span>
+      </div>
+      <p style="font-size:10px;color:#555;margin:0;">Your phone must be on the same WiFi as this PC (port 8082).</p>
+    </div>
+  </div>
+
+  <div class="divider" style="margin: 0 18px;"></div>
+
   <!-- Log -->
   <div style="padding: 10px 18px 6px;">
     <div class="section-title">Live Log</div>
@@ -83,13 +99,43 @@ const DEFAULT_CAMERAS = [
 
 let loginItemEnabled = false;
 
+async function loadPcIps() {
+  try {
+    const ips = await window.relay.getPcIps();
+    renderPcIpList(ips);
+  } catch {}
+}
+
+function renderPcIpList(ips) {
+  const el = document.getElementById("pc-ips-display");
+  if (!el) return;
+  if (!ips || ips.length === 0) {
+    el.innerHTML = '<span style="color:#555;font-size:11px;">No IP found — check WiFi.</span>';
+    return;
+  }
+  el.innerHTML = ips.map(ip =>
+    `<span style="background:#0f1a2e;border:1px solid #1d4ed8;border-radius:6px;padding:4px 10px;font-size:14px;font-weight:700;font-family:monospace;color:#93c5fd;cursor:pointer;" title="Click to copy" onclick="copyIp('${ip}')">${ip}</span>`
+  ).join("");
+}
+
+function renderPcIps() {} // called from onStatus — actual data loaded once in loadPcIps
+
+function copyIp(ip) {
+  navigator.clipboard?.writeText(ip).catch(() => {});
+  const el = document.getElementById("pc-ips-display");
+  const orig = el?.innerHTML;
+  if (el) { el.innerHTML = '<span style="color:#22c55e;font-size:12px;">✓ Copied to clipboard!</span>'; }
+  setTimeout(() => { if (el && orig) el.innerHTML = orig; }, 1800);
+}
+
 async function init() {
   state = await window.relay.getStatus();
   loginItemEnabled = await window.relay.getLoginItem();
   renderAll();
   renderLoginToggle();
 
-  window.relay.onStatus(s => { state = s; renderAll(); });
+  window.relay.onStatus(s => { state = s; renderAll(); renderPcIps(); });
+  loadPcIps();
   window.relay.onLogHistory(lines => {
     const el = document.getElementById("log");
     el.innerHTML = "";
