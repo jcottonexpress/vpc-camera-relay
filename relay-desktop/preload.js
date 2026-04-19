@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("relay", {
   testCamera:    (ip)      => ipcRenderer.invoke("test-camera", ip),
   openRelayDir:  ()        => ipcRenderer.invoke("open-relay-dir"),
   discoverCameras: ()       => ipcRenderer.invoke("discover-cameras"),
+  openHelp:        ()       => ipcRenderer.invoke("open-help"),
   getPcIps:        ()       => ipcRenderer.invoke("get-pc-ips"),
   getLoginItem:  ()        => ipcRenderer.invoke("get-login-item"),
   setLoginItem:  (enabled) => ipcRenderer.invoke("set-login-item", enabled),
