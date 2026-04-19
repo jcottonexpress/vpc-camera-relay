@@ -29,13 +29,13 @@ jobs:
           node-version: 20
 
       - name: Install camera-relay dependencies
-        run: cd tools/camera-relay && npm install
+        run: cd camera-relay && npm install
 
       - name: Install relay-desktop dependencies
-        run: cd tools/relay-desktop && npm install
+        run: cd relay-desktop && npm install
 
       - name: Build Windows installer
-        run: cd tools/relay-desktop && npm run dist:win
+        run: cd relay-desktop && npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -43,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: relay-windows
-          path: tools/relay-desktop/dist/*.exe
+          path: relay-desktop/dist/*.exe
 
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -52,7 +52,7 @@ jobs:
           name: "VP Chef Relay ${{ github.event.inputs.tag || github.ref_name }}"
           draft: false
           prerelease: false
-          files: tools/relay-desktop/dist/*.exe
+          files: relay-desktop/dist/*.exe
 
   build-mac:
     name: macOS (.dmg)
@@ -65,13 +65,13 @@ jobs:
           node-version: 20
 
       - name: Install camera-relay dependencies
-        run: cd tools/camera-relay && npm install
+        run: cd camera-relay && npm install
 
       - name: Install relay-desktop dependencies
-        run: cd tools/relay-desktop && npm install
+        run: cd relay-desktop && npm install
 
       - name: Build macOS DMG
-        run: cd tools/relay-desktop && npm run dist:mac
+        run: cd relay-desktop && npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: relay-mac
-          path: tools/relay-desktop/dist/*.dmg
+          path: relay-desktop/dist/*.dmg
 
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -89,4 +89,4 @@ jobs:
           name: "VP Chef Relay ${{ github.event.inputs.tag || github.ref_name }}"
           draft: false
           prerelease: false
-          files: tools/relay-desktop/dist/*.dmg
+          files: relay-desktop/dist/*.dmg
