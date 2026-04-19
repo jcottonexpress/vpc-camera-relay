@@ -17,6 +17,7 @@ const SERVER_DOMAIN = "vp-chef-studio.replit.app";
 // set your password — it will never be overwritten by auto-updates.
 let RTSP_USER = "admin";
 let RTSP_PASS = "";        // ← only used if relay-config.json is missing
+let RELAY_TOKEN = "";      // ← user token from VP Chef Studio Settings → Camera Relay
 
 const CAMERAS = [
   { slot: 1, ip: "192.168.1.177", label: "Performance Cam" },
@@ -111,8 +112,9 @@ let ONVIF_PASS = "";
       const cfg = JSON.parse(raw);
       if (cfg.rtspUser  !== undefined) RTSP_USER  = cfg.rtspUser;
       if (cfg.rtspPass  !== undefined) RTSP_PASS  = cfg.rtspPass;
-      if (cfg.onvifPass !== undefined) ONVIF_PASS = cfg.onvifPass;
-      else                             ONVIF_PASS = RTSP_PASS;
+      if (cfg.onvifPass  !== undefined) ONVIF_PASS   = cfg.onvifPass;
+      else                              ONVIF_PASS   = RTSP_PASS;
+      if (cfg.relayToken !== undefined) RELAY_TOKEN  = cfg.relayToken;
       // Allow relay-config.json to override the default camera list (for multi-user setup)
       if (Array.isArray(cfg.cameras) && cfg.cameras.length > 0) {
         CAMERAS.splice(0, CAMERAS.length, ...cfg.cameras.map(c => ({
@@ -129,10 +131,11 @@ let ONVIF_PASS = "";
     // Create the config file on first run so the user can edit it once
     try {
       fs.writeFileSync(cfgPath, JSON.stringify({
-        rtspUser:  RTSP_USER,
-        rtspPass:  RTSP_PASS,
-        onvifPass: RTSP_PASS,
-        cameras:   CAMERAS.map(c => ({ slot: c.slot, ip: c.ip, label: c.label })),
+        rtspUser:   RTSP_USER,
+        rtspPass:   RTSP_PASS,
+        onvifPass:  RTSP_PASS,
+        relayToken: RELAY_TOKEN,
+        cameras:    CAMERAS.map(c => ({ slot: c.slot, ip: c.ip, label: c.label })),
       }, null, 2) + "\n");
       console.log("[config] Created relay-config.json — edit cameras / rtspPass to configure your setup.");
     } catch (_) {}
@@ -217,7 +220,10 @@ function sendHttpHeartbeat() {
       method:   "POST",
       hostname: url.hostname,
       path:     url.pathname,
-      headers:  { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+      headers:  Object.assign(
+        { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+        RELAY_TOKEN ? { "Authorization": "Bearer " + RELAY_TOKEN } : {},
+      ),
     }, (res) => {
       res.resume(); // drain and discard body
     });
@@ -532,7 +538,7 @@ function connectWs() {
 
   ws.on("open", () => {
     console.log("[ws] Connected to VP Chef Studio cloud server.");
-    ws.send(JSON.stringify({ type: "register", ips: CAMERAS.map(c => c.ip) }));
+    ws.send(JSON.stringify({ type: "register", ips: CAMERAS.map(c => c.ip), token: RELAY_TOKEN || undefined }));
     startHeartbeatTimer(); // begin HTTP heartbeat pings so all autoscale instances see us
   });
 
