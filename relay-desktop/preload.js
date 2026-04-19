@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("relay", {
   wizardDone:    (cfg)     => ipcRenderer.invoke("wizard-done", cfg),
   testCamera:    (ip)      => ipcRenderer.invoke("test-camera", ip),
   openRelayDir:  ()        => ipcRenderer.invoke("open-relay-dir"),
+  discoverCameras: ()       => ipcRenderer.invoke("discover-cameras"),
+  getPcIps:        ()       => ipcRenderer.invoke("get-pc-ips"),
   getLoginItem:  ()        => ipcRenderer.invoke("get-login-item"),
   setLoginItem:  (enabled) => ipcRenderer.invoke("set-login-item", enabled),
   onStatus:      (fn)      => ipcRenderer.on("status",      (_, d) => fn(d)),
